@@ -1,5 +1,6 @@
 package com.project.nfc.service.dtos
 
+import com.project.nfc.controller.dtos.WeatherInfoFormat
 import java.time.LocalDateTime
 
 data class WeatherInfoCommand(
@@ -9,10 +10,10 @@ data class WeatherInfoCommand(
 )
 
 data class WeatherInfoResult(
-    val temperatureInfo: String,
-    val humidityInfo: String,
-    val windSpeedInfo: String,
-    val hourlyPrecipitationAmountInfo: String
+    val temperatureInfo: WeatherInfoFormat,
+    val humidityInfo: WeatherInfoFormat,
+    val windSpeedInfo: WeatherInfoFormat,
+    val hourlyPrecipitationAmountInfo: WeatherInfoFormat
     //  날씨정보 (온도:14°C 강수확률: 1% 습도: 38% 풍속: 1m/s)
 )
 

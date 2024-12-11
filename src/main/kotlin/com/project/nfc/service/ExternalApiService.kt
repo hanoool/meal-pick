@@ -1,5 +1,6 @@
 package com.project.nfc.service
 
+import com.project.nfc.controller.dtos.WeatherInfoFormat
 import com.project.nfc.service.*
 import com.project.nfc.service.dtos.Item
 import com.project.nfc.service.dtos.WeatherApiResponse
@@ -80,27 +81,34 @@ class ExternalApiService(
     }
 
     private fun makeWeatherInfoResult(result: WeatherApiResponse): WeatherInfoResult {
-        var temperature = ""
-        var humidity = ""
-        var windSpeed = ""
-        var hourlyPrecipitationAmount = ""
+        val weatherInfoList: MutableList<WeatherInfoFormat> = mutableListOf()
 
         if (result.response.body == null) throw IllegalArgumentException(result.response.header.resultMsg)
 
         result.response.body.items.item.map { item ->
             when (item.category) {
-                WeatherCode.TEMPERATURE.code -> temperature = makeFormattedString(WeatherCode.TEMPERATURE, item)
-                WeatherCode.HUMIDITY.code -> humidity = makeFormattedString(WeatherCode.HUMIDITY, item)
-                WeatherCode.WIND_SPEED.code -> windSpeed = makeFormattedString(WeatherCode.WIND_SPEED, item)
-                WeatherCode.HOURLY_PRECIPITATION_AMOUNT.code -> hourlyPrecipitationAmount =
-                    makeFormattedString(WeatherCode.HOURLY_PRECIPITATION_AMOUNT, item)
+                WeatherCode.TEMPERATURE.code -> weatherInfoList.add(makeFormattedString(WeatherCode.TEMPERATURE, item))
+                WeatherCode.HUMIDITY.code -> weatherInfoList.add(makeFormattedString(WeatherCode.HUMIDITY, item))
+                WeatherCode.WIND_SPEED.code -> weatherInfoList.add(makeFormattedString(WeatherCode.WIND_SPEED, item))
+                WeatherCode.HOURLY_PRECIPITATION_AMOUNT.code ->
+                    weatherInfoList.add(makeFormattedString(WeatherCode.HOURLY_PRECIPITATION_AMOUNT, item))
+                else -> null
             }
-        } ?: throw IllegalArgumentException(result.response.header.resultMsg)
+        }
 
-        return WeatherInfoResult(temperature, humidity, windSpeed, hourlyPrecipitationAmount)
+        return toWeatherInfoResult(weatherInfoList)
     }
 
-    private fun makeFormattedString(code: WeatherCode, item: Item): String {
-        return "${code.itemName}: ${item.obsrValue}${code.unit}"
+    private fun toWeatherInfoResult(list: List<WeatherInfoFormat>): WeatherInfoResult {
+        return WeatherInfoResult(
+            list[0],
+            list[1],
+            list[2],
+            list[3],
+        )
+    }
+
+    private fun makeFormattedString(code: WeatherCode, item: Item): WeatherInfoFormat {
+        return WeatherInfoFormat(code.itemName, code.unit, item.obsrValue.toDouble())
     }
 }
