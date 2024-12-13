@@ -5,15 +5,19 @@ import com.project.nfc.service.dtos.Item
 import com.project.nfc.service.dtos.WeatherApiResponse
 import com.project.nfc.service.dtos.WeatherInfoResult
 import com.project.nfc.service.enum.WeatherCode
+import com.project.nfc.service.enum.WeatherErrorCode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Service
+import org.springframework.web.reactive.function.UnsupportedMediaTypeException
+import org.springframework.web.reactive.function.client.ClientResponse
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
 import org.springframework.web.reactive.function.client.bodyToMono
 import org.springframework.web.util.DefaultUriBuilderFactory
 import org.springframework.web.util.DefaultUriBuilderFactory.EncodingMode
 import org.springframework.web.util.UriBuilder
+import reactor.core.publisher.Mono
 import reactor.netty.http.client.HttpClient
 import java.time.Duration
 import java.time.LocalDateTime
@@ -35,7 +39,6 @@ class ExternalApiService(
         val webClient = buildWebClient()
 
         try {
-            // 오류로 body 없을 때 예외 처리 필요
             val result = webClient.get()
                 .uri { uriBuilder: UriBuilder ->
                     uriBuilder
@@ -49,8 +52,14 @@ class ExternalApiService(
                         .queryParam("dataType", json)
                         .build()
                 }
-                .retrieve()
-                .bodyToMono<WeatherApiResponse>()
+                .exchangeToMono { response ->
+                    val contentType = response.headers().contentType()
+                    if (contentType.toString().contains("xml")) {
+                        handleWeatherApiException(response)
+                    } else {
+                        response.bodyToMono<WeatherApiResponse>()
+                    }
+                }
                 .block() ?: throw IllegalArgumentException("no data")
 
             return makeWeatherInfoResult(result)
@@ -98,18 +107,32 @@ class ExternalApiService(
 
                 WeatherCode.HOURLY_PRECIPITATION_AMOUNT.code -> weatherInfoMap[item.category] =
                     makeFormattedString(WeatherCode.HOURLY_PRECIPITATION_AMOUNT, item)
+
                 else -> return@forEach
             }
         }
         return toWeatherInfoResult(weatherInfoMap)
     }
 
+    private fun handleWeatherApiException(response: ClientResponse): Mono<WeatherApiResponse> {
+        return response.bodyToMono(String::class.java).flatMap { xml ->
+            val reasonCodeIndex = xml.indexOf("returnReasonCode") + 17
+            val reasonCode = xml.slice(reasonCodeIndex .. reasonCodeIndex + 1)
+            val errorMessage = WeatherErrorCode.getDescription(reasonCode)
+            Mono.error(IllegalArgumentException(errorMessage))
+        }
+    }
+
     private fun toWeatherInfoResult(map: HashMap<String, WeatherInfoFormat>): WeatherInfoResult {
         return WeatherInfoResult(
-            temperatureInfo = map[WeatherCode.TEMPERATURE.code] ?: throw IllegalArgumentException("${WeatherCode.TEMPERATURE.code} is empty"),
-            humidityInfo = map[WeatherCode.HUMIDITY.code] ?: throw IllegalArgumentException("${WeatherCode.HUMIDITY.code} is empty"),
-            windSpeedInfo = map[WeatherCode.WIND_SPEED.code] ?: throw IllegalArgumentException("${WeatherCode.WIND_SPEED.code} is empty"),
-            hourlyPrecipitationAmountInfo = map[WeatherCode.HOURLY_PRECIPITATION_AMOUNT.code] ?: throw IllegalArgumentException("${WeatherCode.HOURLY_PRECIPITATION_AMOUNT.code} is empty"),
+            temperatureInfo = map[WeatherCode.TEMPERATURE.code]
+                ?: throw IllegalArgumentException("${WeatherCode.TEMPERATURE.code} is empty"),
+            humidityInfo = map[WeatherCode.HUMIDITY.code]
+                ?: throw IllegalArgumentException("${WeatherCode.HUMIDITY.code} is empty"),
+            windSpeedInfo = map[WeatherCode.WIND_SPEED.code]
+                ?: throw IllegalArgumentException("${WeatherCode.WIND_SPEED.code} is empty"),
+            hourlyPrecipitationAmountInfo = map[WeatherCode.HOURLY_PRECIPITATION_AMOUNT.code]
+                ?: throw IllegalArgumentException("${WeatherCode.HOURLY_PRECIPITATION_AMOUNT.code} is empty"),
         )
     }
 
