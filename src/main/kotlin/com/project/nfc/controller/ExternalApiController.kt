@@ -19,7 +19,7 @@ class ExternalApiController(
     fun fetchRealTimeWeatherInfo(request: WeatherInfoRequest): WeatherInfoResponse {
         val result = externalApiService.fetchRealTimeWeatherInfo(request.x, request.y, request.dateTime)
         return WeatherInfoResponse(
-            temperatureInfo = result.temperatureInfo,
+            weatherInfoFormat = result.temperatureInfo,
             humidityInfo = result.humidityInfo,
             windSpeedInfo = result.windSpeedInfo,
             hourlyPrecipitationAmountInfo = result.hourlyPrecipitationAmountInfo
